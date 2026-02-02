@@ -13,25 +13,27 @@ module tt_um_prampal_mealy (
 
     wire x1 = ui_in[0];
 
-    // State registers
-    reg [2:0] state, next_state;
-
+    // State encoding
     localparam A = 3'd0,
                B = 3'd1,
                C = 3'd2,
                D = 3'd3,
                E = 3'd4;
 
-    // State update
-    always @(posedge clk) begin
+    reg [2:0] state, next_state;
+
+    // State register
+    always @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             state <= A;
         else
             state <= next_state;
     end
 
-    // Next-state logic
+    // Next-state logic (purely combinational)
     always @(*) begin
+        next_state = state; // default (prevents unintended latches)
+
         case (state)
             A: next_state = x1 ? D : B;
             B: next_state = x1 ? E : C;
@@ -42,11 +44,11 @@ module tt_um_prampal_mealy (
         endcase
     end
 
-    // Mealy output (depends on state AND input)
+    // Mealy output logic (depends on current state AND input)
     wire z1 = (state == D && !x1) ||
               (state == B &&  x1);
 
-    // Outputs
+    // Output mapping
     assign uo_out[2:0] = state;
     assign uo_out[3]   = z1;
     assign uo_out[7:4] = 4'b0000;
@@ -54,6 +56,7 @@ module tt_um_prampal_mealy (
     assign uio_out = 8'b0;
     assign uio_oe  = 8'b0;
 
+    // Prevent unused warnings
     wire _unused = &{ena, ui_in[7:1], uio_in, 1'b0};
 
 endmodule
