@@ -1,59 +1,59 @@
-import cocotb
-from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, ClockCycles
+`default_nettype none
 
-@cocotb.test()
-async def test_mealy_fsm(dut):
-    dut._log.info("Starting Mealy FSM test")
+module tt_um_prampal_mealy (
+    input  wire [7:0] ui_in,
+    output wire [7:0] uo_out,
+    input  wire [7:0] uio_in,
+    output wire [7:0] uio_out,
+    output wire [7:0] uio_oe,
+    input  wire       ena,
+    input  wire       clk,
+    input  wire       rst_n
+);
 
-    clock = Clock(dut.clk, 10, units="us")
-    cocotb.start_soon(clock.start())
+    wire x1 = ui_in[0];
 
-    dut.ena.value = 1
-    dut.ui_in.value = 0
-    dut.uio_in.value = 0
-    dut.rst_n.value = 0
+    // State registers
+    reg [2:0] state, next_state;
 
-    await ClockCycles(dut.clk, 2)
-    dut.rst_n.value = 1
-    await RisingEdge(dut.clk)
+    localparam A = 3'd0,
+               B = 3'd1,
+               C = 3'd2,
+               D = 3'd3,
+               E = 3'd4;
 
-    # State encoding
-    A, B, C, D, E = 0, 1, 2, 3, 4
-    state = A
+    // State update
+    always @(posedge clk) begin
+        if (!rst_n)
+            state <= A;
+        else
+            state <= next_state;
+    end
 
-    x1_sequence = [0,1,0,0,1,1,0,1,0,1]
+    // Next-state logic
+    always @(*) begin
+        case (state)
+            A: next_state = x1 ? D : B;
+            B: next_state = x1 ? E : C;
+            C: next_state = A;
+            D: next_state = x1 ? C : E;
+            E: next_state = A;
+            default: next_state = A;
+        endcase
+    end
 
-    for x1 in x1_sequence:
-        dut.ui_in[0].value = x1
+    // Mealy output (depends on state AND input)
+    wire z1 = (state == D && !x1) ||
+              (state == B &&  x1);
 
-        # Mealy output depends on CURRENT state and CURRENT input
-        expected_z1 = int((state == D and x1 == 0) or
-                          (state == B and x1 == 1))
+    // Outputs
+    assign uo_out[2:0] = state;
+    assign uo_out[3]   = z1;
+    assign uo_out[7:4] = 4'b0000;
 
-        await RisingEdge(dut.clk)
+    assign uio_out = 8'b0;
+    assign uio_oe  = 8'b0;
 
-        # Read hardware outputs
-        uo = dut.uo_out.value.integer
-        hw_state = uo & 0b111
-        hw_z1 = (uo >> 3) & 1
+    wire _unused = &{ena, ui_in[7:1], uio_in, 1'b0};
 
-        dut._log.info(f"x1={x1} | expected_state={state} hw_state={hw_state} | expected_z1={expected_z1} hw_z1={hw_z1}")
-
-        assert hw_z1 == expected_z1, f"OUTPUT MISMATCH: expected {expected_z1}, got {hw_z1}"
-
-        # Now update state model (state register updates on clock edge)
-        if state == A:
-            state = D if x1 else B
-        elif state == B:
-            state = E if x1 else C
-        elif state == C:
-            state = A
-        elif state == D:
-            state = C if x1 else E
-        elif state == E:
-            state = A
-
-        assert hw_state == state, f"STATE MISMATCH: expected {state}, got {hw_state}"
-
-    dut._log.info("Mealy FSM test PASSED ✅")
+endmodule
