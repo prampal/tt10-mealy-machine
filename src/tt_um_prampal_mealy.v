@@ -42,7 +42,7 @@ module tt_um_prampal_mealy (
         endcase
     end
 
-    // 🔥 Mealy output (depends on state AND input)
+    // Mealy output (depends on state AND input)
     wire z1 = (state == D && !x1) ||
               (state == B &&  x1);
 
