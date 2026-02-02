@@ -20,43 +20,40 @@ module tt_um_prampal_mealy (
                D = 3'd3,
                E = 3'd4;
 
-    reg [2:0] state, next_state;
+    reg [2:0] state;
 
     // State register
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             state <= A;
+        else begin
+            case (state)
+                A: state <= x1 ? D : B;
+                B: state <= x1 ? E : C;
+                C: state <= A;
+                D: state <= x1 ? C : E;
+                E: state <= A;
+                default: state <= A;
+            endcase
+        end
+    end
+
+    // Registered Mealy output (prevents race with state update)
+    reg z1_reg;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            z1_reg <= 1'b0;
         else
-            state <= next_state;
+            z1_reg <= (state == D && !x1) || (state == B && x1);
     end
 
-    // Next-state logic (purely combinational)
-    always @(*) begin
-        next_state = state; // default (prevents unintended latches)
-
-        case (state)
-            A: next_state = x1 ? D : B;
-            B: next_state = x1 ? E : C;
-            C: next_state = A;
-            D: next_state = x1 ? C : E;
-            E: next_state = A;
-            default: next_state = A;
-        endcase
-    end
-
-    // Mealy output logic (depends on current state AND input)
-    wire z1 = (state == D && !x1) ||
-              (state == B &&  x1);
-
-    // Output mapping
     assign uo_out[2:0] = state;
-    assign uo_out[3]   = z1;
-    assign uo_out[7:4] = 4'b0000;
+    assign uo_out[3]   = z1_reg;
+    assign uo_out[7:4] = 4'b0;
 
     assign uio_out = 8'b0;
     assign uio_oe  = 8'b0;
 
-    // Prevent unused warnings
     wire _unused = &{ena, ui_in[7:1], uio_in, 1'b0};
 
 endmodule
