@@ -11,49 +11,67 @@ module tt_um_prampal_mealy (
     input  wire       rst_n
 );
 
-    wire x1 = ui_in[0];
+   wire x1 = ui_in[0];
+    wire z1;
+    reg [3:1] y;
+    reg [3:1] next_state;
+  
+parameter state_a=3'b000,
+        state_b=3'b001,
+        state_c=3'b011,
+        state_d=3'b010,
+        state_e=3'b100;
+always@(posedge clk)
+begin
+    if(~rst_n)
+        y<=state_a;
+    else
+        y<=next_state;
+end
 
-    // State encoding
-    localparam A = 3'd0,
-               B = 3'd1,
-               C = 3'd2,
-               D = 3'd3,
-               E = 3'd4;
+assign z1=(y[3] & ~x1 & clk)|(y[2] & y[1] & x1 & clk);
+always @(y or x1)
+begin
+case(y)
+state_a: begin
+if(x1==0)
+next_state=state_b;
+else
+next_state=state_d;
+end
+state_b: begin
+if(x1==0)
+next_state=state_c;
+else
+next_state=state_e;
+end
+state_c: begin
+next_state=state_a;
+end
+state_d: begin
+if(x1==0)
+next_state=state_e;
+else
+next_state=state_c;
+end
+state_e: begin
+next_state=state_a;
+end
+default:next_state=state_a;
+endcase
+end
 
-    reg [2:0] state;
-
-    // State register
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
-            state <= A;
-        else begin
-            case (state)
-                A: state <= x1 ? D : B;
-                B: state <= x1 ? E : C;
-                C: state <= A;
-                D: state <= x1 ? C : E;
-                E: state <= A;
-                default: state <= A;
-            endcase
-        end
-    end
-
-    // Registered Mealy output (prevents race with state update)
-    reg z1_reg;
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
-            z1_reg <= 1'b0;
-        else
-            z1_reg <= (state == D && !x1) || (state == B && x1);
-    end
-
-    assign uo_out[2:0] = state;
-    assign uo_out[3]   = z1_reg;
-    assign uo_out[7:4] = 4'b0;
-
-    assign uio_out = 8'b0;
-    assign uio_oe  = 8'b0;
-
-    wire _unused = &{ena, ui_in[7:1], uio_in, 1'b0};
-
+// All output pins must be assigned. If not used, assign to 0.
+assign uo_out[0] = y[1];
+assign uo_out[1] = y[2];
+assign uo_out[2] = y[3];
+assign uo_out[3] = z1;
+assign uo_out[4] = 1'b0;
+assign uo_out[5] = 1'b0;
+assign uo_out[6] = 1'b0;
+assign uo_out[7] = 1'b0;
+assign uio_out = 0;
+assign uio_oe = 0;
+// List all unused inputs to prevent warnings
+wire _unused = &{ena, ui_in[7:1], uio_in, 1'b0};
 endmodule
